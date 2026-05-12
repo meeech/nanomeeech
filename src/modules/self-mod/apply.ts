@@ -43,8 +43,13 @@ export const applyInstallPackages: ApprovalHandler = async ({ session, payload, 
       id: `appr-note-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
       kind: 'chat',
       timestamp: new Date().toISOString(),
-      platformId: session.agent_group_id,
-      channelType: 'agent',
+      // Routing fields are null so extractRouting() in the container falls
+      // through to the configured destination(s). Setting channelType='agent'
+      // + platformId=<self group id> here poisons routing: the agent's reply
+      // gets written with the same fields and the host A2A-routes it back
+      // into this session as an inbound, creating an echo loop.
+      platformId: null,
+      channelType: null,
       threadId: null,
       content: JSON.stringify({
         text: `Packages installed (${pkgs}) and container rebuilt. Verify the new packages are available (e.g. run them or check versions) and report the result to the user.`,

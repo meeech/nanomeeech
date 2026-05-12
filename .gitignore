@@ -20,6 +20,9 @@ groups/*
 **/.claude-shared.md
 **/.claude-fragments/
 
+# Local-only setup/build bug log — see notes/setup-bugs.md
+/notes/
+
 # Secrets
 *.keys.json
 .env

@@ -74,6 +74,20 @@ export interface ChatSdkBridgeConfig {
    * and reactions still target the head of the reply.
    */
   maxTextLength?: number;
+  /**
+   * Optional: called when an inbound message arrives and host processing begins.
+   * Channels can use this to show a per-platform "processing" indicator
+   * (e.g. a reaction on Slack, typing dots on Telegram). Fire-and-forget;
+   * errors are not propagated.
+   */
+  onProcessingStart?: (channelId: string, threadId: string, platformMsgId: string) => void | Promise<void>;
+  /**
+   * Optional: called at the start of outbound delivery to a thread. Channels
+   * use this to clear whatever indicator they showed in `onProcessingStart`.
+   * Fired even for edit/reaction-only deliveries since any visible output
+   * means the user has seen progress. Fire-and-forget.
+   */
+  onProcessingEnd?: (channelId: string, threadId: string) => void | Promise<void>;
 }
 
 /**
@@ -222,6 +236,9 @@ export function createChatSdkBridge(config: ChatSdkBridgeConfig): ChannelAdapter
       // wirings still fire on in-thread mentions.
       chat.onSubscribedMessage(async (thread, message) => {
         const channelId = adapter.channelIdFromThreadId(thread.id);
+        if (config.onProcessingStart) {
+          void Promise.resolve(config.onProcessingStart(channelId, thread.id, message.id)).catch(() => {});
+        }
         await setupConfig.onInbound(
           channelId,
           thread.id,
@@ -232,6 +249,9 @@ export function createChatSdkBridge(config: ChatSdkBridgeConfig): ChannelAdapter
       // @mention in an unsubscribed thread — SDK-confirmed bot mention.
       chat.onNewMention(async (thread, message) => {
         const channelId = adapter.channelIdFromThreadId(thread.id);
+        if (config.onProcessingStart) {
+          void Promise.resolve(config.onProcessingStart(channelId, thread.id, message.id)).catch(() => {});
+        }
         await setupConfig.onInbound(channelId, thread.id, await messageToInbound(message, true, true));
       });
 
@@ -247,6 +267,9 @@ export function createChatSdkBridge(config: ChatSdkBridgeConfig): ChannelAdapter
           sender: (message.author as any)?.fullName ?? (message.author as any)?.userId ?? 'unknown',
           threadId: thread.id,
         });
+        if (config.onProcessingStart) {
+          void Promise.resolve(config.onProcessingStart(channelId, thread.id, message.id)).catch(() => {});
+        }
         await setupConfig.onInbound(channelId, thread.id, await messageToInbound(message, true, false));
       });
 
@@ -262,6 +285,9 @@ export function createChatSdkBridge(config: ChatSdkBridgeConfig): ChannelAdapter
       // flood gate.
       chat.onNewMessage(/[\s\S]*/, async (thread, message) => {
         const channelId = adapter.channelIdFromThreadId(thread.id);
+        if (config.onProcessingStart) {
+          void Promise.resolve(config.onProcessingStart(channelId, thread.id, message.id)).catch(() => {});
+        }
         await setupConfig.onInbound(channelId, thread.id, await messageToInbound(message, false, true));
       });
 
@@ -355,6 +381,9 @@ export function createChatSdkBridge(config: ChatSdkBridgeConfig): ChannelAdapter
       // "discord:guildId:channelId") — use it directly as the thread ID
       const tid = threadId ?? platformId;
       const content = message.content as Record<string, unknown>;
+      if (config.onProcessingEnd) {
+        void Promise.resolve(config.onProcessingEnd(adapter.channelIdFromThreadId(tid), tid)).catch(() => {});
+      }
 
       if (content.operation === 'edit' && content.messageId) {
         await adapter.editMessage(tid, content.messageId as string, {
