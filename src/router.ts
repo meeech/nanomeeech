@@ -360,7 +360,21 @@ export async function routeInbound(event: InboundEvent): Promise<void> {
  *                      session existence IS our subscription state; once
  *                      a thread has engaged us once, follow-ups arrive
  *                      with no mention and should still fire.
+ *   'mention-or-pattern' — platform mention OR the regex in engage_pattern
+ *                      matches the message text. Use when the bot should
+ *                      respond to its @-handle AND casual name-drops
+ *                      ("hey quill, ...") without subscribing to every
+ *                      message.
  */
+/**
+ * Compile an engage_pattern. Recognizes a leading `(?i)` as case-insensitive
+ * since JavaScript's RegExp doesn't accept inline flag groups bare like PCRE.
+ */
+function compilePattern(pat: string): RegExp {
+  if (pat.startsWith('(?i)')) return new RegExp(pat.slice(4), 'i');
+  return new RegExp(pat);
+}
+
 function evaluateEngage(
   agent: MessagingGroupAgent,
   text: string,
@@ -373,7 +387,7 @@ function evaluateEngage(
       const pat = agent.engage_pattern ?? '.';
       if (pat === '.') return true;
       try {
-        return new RegExp(pat).test(text);
+        return compilePattern(pat).test(text);
       } catch {
         // Bad regex: fail open so admin sees the agent responding + can fix.
         return true;
@@ -381,6 +395,17 @@ function evaluateEngage(
     }
     case 'mention':
       return isMention;
+    case 'mention-or-pattern': {
+      if (isMention) return true;
+      const pat = agent.engage_pattern;
+      if (!pat) return false;
+      if (pat === '.') return true;
+      try {
+        return compilePattern(pat).test(text);
+      } catch {
+        return true;
+      }
+    }
     case 'mention-sticky': {
       if (isMention) return true;
       // Sticky follow-up: session already exists for this (agent, mg, thread)

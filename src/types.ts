@@ -77,7 +77,7 @@ export interface UserDm {
   resolved_at: string;
 }
 
-export type EngageMode = 'pattern' | 'mention' | 'mention-sticky';
+export type EngageMode = 'pattern' | 'mention' | 'mention-sticky' | 'mention-or-pattern';
 export type SenderScope = 'all' | 'known';
 export type IgnoredMessagePolicy = 'drop' | 'accumulate';
 
@@ -87,9 +87,9 @@ export interface MessagingGroupAgent {
   agent_group_id: string;
   engage_mode: EngageMode;
   /**
-   * Regex source string used when engage_mode='pattern'. `'.'` is the sentinel
-   * for "match every message" (the "always" flavor). Ignored for 'mention' /
-   * 'mention-sticky' modes.
+   * Regex source string used when engage_mode='pattern' or
+   * 'mention-or-pattern'. `'.'` is the sentinel for "match every message"
+   * (the "always" flavor). Ignored for 'mention' / 'mention-sticky' modes.
    */
   engage_pattern: string | null;
   sender_scope: SenderScope;
