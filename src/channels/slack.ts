@@ -28,7 +28,10 @@ registerChannelAdapter('slack', {
     // as the "actually engaged" signal: onProcessingStart just stores the
     // candidate msg id; setTyping promotes it to an actual reaction on first
     // call; onProcessingEnd removes it (and clears unpromoted state).
-    interface PendingReaction { msgId: string; reacted: boolean; }
+    interface PendingReaction {
+      msgId: string;
+      reacted: boolean;
+    }
     const pendingReactions = new Map<string, PendingReaction>();
     const REACTION_EMOJI = 'hourglass_flowing_sand';
 
