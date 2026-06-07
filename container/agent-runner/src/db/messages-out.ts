@@ -4,6 +4,7 @@
  * Writes to outbound.db (container-owned).
  * The host polls this DB (read-only) for undelivered messages.
  */
+import { getConfig } from '../config.js';
 import { getInboundDb, getOutboundDb } from './connection.js';
 
 export interface MessageOutRow {
@@ -90,11 +91,19 @@ export function writeMessageOut(msg: WriteMessageOut): number {
 export function getMessageIdBySeq(seq: number): string | null {
   const inbound = getInboundDb();
 
-  // Inbound messages: ID is already the platform message ID
+  // Inbound messages: ID is already the platform message ID, but the host
+  // appends ":<agentGroupId>" in router.ts (messageIdForAgent) to keep the
+  // messages_in PK unique when one platform message fans out to multiple
+  // agent-group sessions. Strip that suffix here so the value we return is
+  // the adapter's native message id (e.g. "<chatId>:<msgId>" for Telegram),
+  // which is what edit_message / add_reaction hand back to the adapter.
   const inRow = inbound.prepare('SELECT id FROM messages_in WHERE seq = ?').get(seq) as
     | { id: string }
     | undefined;
-  if (inRow) return inRow.id;
+  if (inRow) {
+    const suffix = `:${getConfig().agentGroupId}`;
+    return inRow.id.endsWith(suffix) ? inRow.id.slice(0, -suffix.length) : inRow.id;
+  }
 
   // Outbound messages: look up platform message ID from delivered table
   const outRow = getOutboundDb().prepare('SELECT id FROM messages_out WHERE seq = ?').get(seq) as
