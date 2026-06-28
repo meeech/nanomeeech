@@ -19,6 +19,32 @@ ops/start.sh --status   # report current state only, change nothing
 
 `~/start.sh` is a thin wrapper that calls this, so you can run it from home.
 
+### Boot wiring — `com.user.nanoclaw-coldstart`
+
+`start.sh` is run automatically at login by a launchd agent
+(`~/Library/LaunchAgents/com.user.nanoclaw-coldstart.plist`, `RunAtLoad`). This
+install runs with **no auto-login** (keeps the account cold at rest): the Mac
+boots to the login window — reachable over Tailscale, SSH, and Screen Sharing,
+which are all *system* daemons up before any login — and the stack comes up
+when a human logs in (typically via Screen Sharing). That login fires the agent,
+which runs `start.sh`.
+
+**Critical plist key — `AbandonProcessGroup=true`.** `start.sh` calls
+`podman machine start`, which spawns the gvproxy + VM helper processes. A
+one-shot LaunchAgent defaults to `AbandonProcessGroup=false`, so launchd kills
+the job's entire process group when `start.sh` exits — taking the freshly
+started podman VM down with it (symptom: a clean `stopped` state seconds after a
+"successful" start, then nanoclaw can't reach any containers).
+`AbandonProcessGroup=true` lets the VM survive the agent exiting. **Do not
+remove it.**
+
+```bash
+# install (load)
+launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.user.nanoclaw-coldstart.plist
+# uninstall (unload)
+launchctl bootout   gui/$(id -u)/com.user.nanoclaw-coldstart
+```
+
 ## `podman-watchdog.sh` — auto-recover a wedged VM
 
 Background: the applehv VM + gvproxy networking layer occasionally wedges hard
